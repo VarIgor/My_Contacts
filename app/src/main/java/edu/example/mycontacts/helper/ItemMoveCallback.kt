@@ -1,0 +1,41 @@
+package edu.example.mycontacts.helper
+
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.RecyclerView
+import edu.example.mycontacts.ContactsAdapter
+
+class ItemMoveCallback(val adapter: ItemTouchHelpersContract) : ItemTouchHelper.Callback() {
+
+    val mAdapter = adapter
+
+    override fun isLongPressDragEnabled(): Boolean {
+        return true
+    }
+
+    override fun isItemViewSwipeEnabled(): Boolean {
+        return true
+    }
+
+    override fun getMovementFlags(
+        recyclerView: RecyclerView,
+        viewHolder: RecyclerView.ViewHolder
+    ): Int {
+        val dragFlag = ItemTouchHelper.UP or ItemTouchHelper.DOWN
+        val swipeFlag = ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT
+        return makeMovementFlags(dragFlag, swipeFlag)
+    }
+
+    override fun onMove(
+        recyclerView: RecyclerView,
+        viewHolder: RecyclerView.ViewHolder,
+        target: RecyclerView.ViewHolder
+    ): Boolean {
+        mAdapter.onRowMoved(viewHolder.absoluteAdapterPosition, target.absoluteAdapterPosition)
+        return true
+    }
+
+    override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+        mAdapter.onItemDismiss(viewHolder, direction)
+    }
+
+}
