@@ -11,5 +11,8 @@
 /build
 /captures
 .externalNativeBuild
+.metadata/
+*.lock
 .cxx
 local.properties
+.idea/deviceManager.xml
