@@ -2,12 +2,10 @@ package edu.example.mycontacts
 
 import android.content.Context
 import android.content.DialogInterface
-import android.content.SharedPreferences
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
-import android.util.SparseArray
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
@@ -25,10 +23,11 @@ import edu.example.mycontacts.data.ContactsAppDatabase
 import edu.example.mycontacts.databinding.ActivityMainBinding
 import edu.example.mycontacts.model.Contact
 import edu.example.mycontacts.helper.ItemMoveCallback
+import edu.example.mycontacts.helper.OnContactClickListener
 import edu.example.mycontacts.utils.Util
 import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), OnContactClickListener {
 
     private lateinit var binding: ActivityMainBinding
 
@@ -43,10 +42,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-//        binding = ActivityMainBinding.inflate(layoutInflater)
-//        setContentView(binding.root) // view binding
-
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
         buttonHandler = MainActivityButtonHandler(this)
@@ -67,7 +62,6 @@ class MainActivity : AppCompatActivity() {
         val touchHelper = ItemTouchHelper(callback)
         touchHelper.attachToRecyclerView(recyclerView)
 
-//        binding.fab.setOnClickListener { addAndEditContact(false, null, 0) }
     }
 
     private fun setupRecyclerView() {
@@ -101,19 +95,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         alertDialogBuilderUserInput.setCancelable(false)
-            .setPositiveButton(if (isUpdate) "Update" else "Save",
+            .setPositiveButton(
+                if (isUpdate) "Update" else "Save",
                 DialogInterface.OnClickListener { dialog, which -> })
             .setNegativeButton(
                 "Cancel",
                 DialogInterface.OnClickListener { dialog, which -> dialog.cancel() })
-        //           .setNegativeButton(if (isUpdate) "Delete" else "Cancel",
-        //             DialogInterface.OnClickListener { dialog, which ->
-//                    if (isUpdate) {
-//                        deleteContact(contact, position)
-//                    } else {
-//                        dialog.cancel()
-//                    }
-//                })
 
         val alertDialog = alertDialogBuilderUserInput.create()
         alertDialog.show()
@@ -225,9 +212,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class MainActivityButtonHandler(context: Context) {
-         fun onButtonClick(view: View) {
+        fun onButtonClick(view: View) {
             binding.fab.setOnClickListener { addAndEditContact(false, null, 0) }
         }
     }
 
+    override fun onContactClick(
+        contact: Contact,
+        position: Int
+    ) {
+        addAndEditContact(true, contact, position)
+    }
+
+    override fun onContactDelete(
+        contact: Contact,
+        position: Int
+    ) {
+        deleteContact(contact, position)
+    }
+
+    override fun onContactEdit(
+        contact: Contact,
+        position: Int
+    ) {
+       addAndEditContact(true, contact, position)
+    }
 }
