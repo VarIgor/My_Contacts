@@ -3,10 +3,8 @@ package edu.example.mycontacts
 
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.databinding.DataBindingUtil
-import androidx.databinding.ViewDataBinding
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.Adapter
@@ -36,9 +34,6 @@ class ContactsAdapter(
 
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ContactViewHolder {
-//        val itemView =
-//            LayoutInflater.from(parent.context).inflate(R.layout.contact_list_item, parent, false)
-//        return ContactViewHolder(itemView)
 
         val contactListItemBinding = DataBindingUtil.inflate<ContactListItemBinding>(
             LayoutInflater.from(parent.context), R.layout.contact_list_item, parent, false
@@ -73,7 +68,6 @@ class ContactsAdapter(
         }
 
         notifyItemMoved(fromPosition, toPosition)
-
 
     }
 

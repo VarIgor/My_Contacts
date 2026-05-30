@@ -2,12 +2,10 @@ package edu.example.mycontacts
 
 import android.content.Context
 import android.content.DialogInterface
-import android.content.SharedPreferences
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
-import android.util.SparseArray
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
@@ -44,7 +42,6 @@ class MainActivity : AppCompatActivity(), OnContactClickListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
         buttonHandler = MainActivityButtonHandler(this)
