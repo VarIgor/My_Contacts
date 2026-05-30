@@ -14,10 +14,14 @@ import androidx.recyclerview.widget.RecyclerView.ViewHolder
 import edu.example.mycontacts.databinding.ContactListItemBinding
 import edu.example.mycontacts.model.Contact
 import edu.example.mycontacts.helper.ItemTouchHelpersContract
+import edu.example.mycontacts.helper.OnContactClickListener
 import java.util.Collections
 
 
-class ContactsAdapter(var contacts: MutableList<Contact>, val mainActivity: MainActivity) :
+class ContactsAdapter(
+    var contacts: MutableList<Contact>,
+    private val clickListener: OnContactClickListener
+) :
     Adapter<ContactsAdapter.ContactViewHolder>(), ItemTouchHelpersContract {
 
     public fun setContact(contacts: MutableList<Contact>) {
@@ -25,30 +29,9 @@ class ContactsAdapter(var contacts: MutableList<Contact>, val mainActivity: Main
     }
 
 
-//    class ContactViewHolder : RecyclerView.ViewHolder {
-//
-//        val firstNameText: TextView
-//        val lastNameText: TextView
-//        val emailText: TextView
-//        val numberPhoneText: TextView
-//
-//        constructor(itemView: View) : super(itemView) {
-//            firstNameText = itemView.findViewById(R.id.firstNameTextView)
-//            lastNameText = itemView.findViewById(R.id.lastNameTextView)
-//            emailText = itemView.findViewById(R.id.emailTextView)
-//            numberPhoneText = itemView.findViewById(R.id.numberPhoneTextView)
-//        }
-//    }
-
-    class ContactViewHolder( var contactListItemBinding: ContactListItemBinding) :
+    class ContactViewHolder(var contactListItemBinding: ContactListItemBinding) :
         RecyclerView.ViewHolder(contactListItemBinding.root) {
 
-//        private lateinit var contactListItemBinding: ContactListItemBinding
-
-
-//        constructor(contactListItemBinding: ContactListItemBinding) {
-//            this.contactListItemBinding = contactListItemBinding
-//        }
     }
 
 
@@ -58,7 +41,7 @@ class ContactsAdapter(var contacts: MutableList<Contact>, val mainActivity: Main
 //        return ContactViewHolder(itemView)
 
         val contactListItemBinding = DataBindingUtil.inflate<ContactListItemBinding>(
-            LayoutInflater.from(parent.context), R.layout.contact_list_item, parent,false
+            LayoutInflater.from(parent.context), R.layout.contact_list_item, parent, false
         )
         return ContactViewHolder(contactListItemBinding)
     }
@@ -71,15 +54,10 @@ class ContactsAdapter(var contacts: MutableList<Contact>, val mainActivity: Main
 
         val contact = contacts[position]
 
-//        holder.firstNameText.text = contact.firstName
-//        holder.lastNameText.text = contact.lastName
-//        holder.emailText.text = contact.email
-//        holder.numberPhoneText.text = contact.phoneNumber
-
         holder.contactListItemBinding.contact = contact
 
         holder.itemView.setOnClickListener {
-            mainActivity.addAndEditContact(true, contact, position)
+            clickListener.onContactClick(contact, position)
         }
     }
 
@@ -104,15 +82,13 @@ class ContactsAdapter(var contacts: MutableList<Contact>, val mainActivity: Main
         when (directory) {
             ItemTouchHelper.LEFT -> {
                 Log.d("Delete", "Delete item ${contacts[position].firstName}")
-                mainActivity.deleteContact(contacts[position], position)
+                clickListener.onContactDelete(contacts[position], position)
                 notifyItemRemoved(position)
             }
 
             ItemTouchHelper.RIGHT -> {
                 Log.d("Update", "Update item ${contacts[position].firstName}")
-                mainActivity.addAndEditContact(
-                    true, contacts[position], position
-                )
+                clickListener.onContactEdit(contacts[position], position)
                 notifyItemChanged(position)
             }
         }
