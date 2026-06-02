@@ -19,7 +19,7 @@ interface ContactDao {
     @Delete
      fun deleteContact(contact: Contact)
 
-    @Query("select * from contacts")
+    @Query("SELECT * FROM contacts ORDER BY display_order ASC")
      fun getAllContacts(): MutableList<Contact>
 
     @Query("select * from contacts where contact_id ==:contactId")
