@@ -2,7 +2,6 @@ package edu.example.mycontacts.model
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.Ignore
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "contacts")
@@ -23,6 +22,9 @@ class Contact{
 
     @ColumnInfo(name = "phone_number")
     var phoneNumber:String
+
+    @ColumnInfo(name = "display_order", defaultValue = "0")
+    var displayOrder: Int = 0
 
     constructor(id:Long, firstName: String, lastName: String, email: String, phoneNumber: String){
         this.id = id
