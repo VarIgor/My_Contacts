@@ -67,29 +67,31 @@ class ContactsAdapter(
             }
         }
 
-        contacts.forEachIndexed { index, contact ->
-            contact.displayOrder = index
+        val start = minOf(fromPosition, toPosition)
+        val end = maxOf(fromPosition, toPosition)
+        for (i in start..end) {
+            contacts[i].displayOrder = i
         }
-
-        orderListener?.onOrderChanged(contacts)
-
+        val affectedContacts = contacts.subList(start, end + 1).toList()
+        orderListener?.onOrderChanged(affectedContacts)
         notifyItemMoved(fromPosition, toPosition)
-
     }
 
     override fun onItemDismiss(viewHolder: ViewHolder, directory: Int) {
         val position = viewHolder.absoluteAdapterPosition
+        if (position == RecyclerView.NO_POSITION) return
+
         when (directory) {
             ItemTouchHelper.LEFT -> {
                 Log.d("Delete", "Delete item ${contacts[position].firstName}")
-                clickListener.onContactDelete(contacts[position], position)
-                notifyItemRemoved(position)
+                val contact = contacts[position]
+                clickListener.onContactDelete(contact, position)
             }
 
             ItemTouchHelper.RIGHT -> {
                 Log.d("Update", "Update item ${contacts[position].firstName}")
-                clickListener.onContactEdit(contacts[position], position)
-                notifyItemChanged(position)
+                val contact = contacts[position]
+                clickListener.onContactEdit(contact, position)
             }
         }
     }

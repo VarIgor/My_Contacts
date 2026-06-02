@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.room.Room
+import com.google.android.material.snackbar.Snackbar
 import edu.example.mycontacts.data.ContactsAppDatabase
 import edu.example.mycontacts.databinding.ActivityMainBinding
 import edu.example.mycontacts.model.Contact
@@ -151,71 +152,74 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
     }
 
     fun createContact(contact: Contact) {
-        Thread(Runnable {
-            executor.execute {
-                val id = contactsAppDatabase.getContactDao().addContact(contact)
-                val contact = contactsAppDatabase.getContactDao().getContact(id)
-                if (contact != null) {
-                    contactsList.add(0, contact)
-                }
-                handler.post {
-                    getAllContacts()
-                    contactsAdapter.notifyDataSetChanged()
+        contact.displayOrder = contactsList.size
+        executor.execute {
+            val id = contactsAppDatabase.getContactDao().addContact(contact)
+            val newContact = contactsAppDatabase.getContactDao().getContact(id)
+            handler.post {
+                if (newContact != null) {
+                    contactsList.add(newContact)
+                    contactsAdapter.notifyItemInserted(contactsList.size - 1)
                 }
             }
-        }).start()
-
+        }
     }
 
     fun getAllContacts() {
-        Thread(Runnable {
-            executor.execute {
-                contactsList = contactsAppDatabase.getContactDao().getAllContacts()
-
-                handler.post {
-                    contactsAdapter.setContact(contactsList)
-                    contactsAdapter.notifyDataSetChanged()
-                }
+        executor.execute {
+            contactsList = contactsAppDatabase.getContactDao().getAllContacts()
+            handler.post {
+                contactsAdapter.setContact(contactsList)
+                contactsAdapter.notifyDataSetChanged()
             }
-        }).start()
+        }
 
     }
 
     open fun updateContact(contact: Contact, position: Int) {
 
-        val updateContact = contactsList.get(position)
+        val updateContact = contactsList[position]
         updateContact.firstName = contact.firstName
         updateContact.lastName = contact.lastName
         updateContact.email = contact.email
         updateContact.phoneNumber = contact.phoneNumber
-        contactsList.set(position, updateContact)
 
-        Thread(Runnable {
-            executor.execute {
-                contactsAppDatabase.getContactDao().updateContact(updateContact)
-                handler.post {
-                    getAllContacts()
-                }
+        executor.execute {
+            contactsAppDatabase.getContactDao().updateContact(updateContact)
+            handler.post {
+                contactsAdapter.notifyItemChanged(position)
             }
-        }).start()
+        }
     }
 
     open fun deleteContact(contact: Contact?, position: Int) {
+        val contactToDelete = contact ?: return
 
-        contactsList.removeAt(position)
-        Thread(Runnable {
-            executor.execute {
-                contactsAppDatabase.getContactDao().deleteContact(contact as Contact)
-                handler.post {
-                    getAllContacts()
+        executor.execute {
+            contactsAppDatabase.getContactDao().deleteContact(contactToDelete)
+            handler.post {
+                if (position < contactsList.size && contactsList[position].id == contactToDelete.id) {
+                    contactsList.removeAt(position)
+                    contactsAdapter.notifyItemRemoved(position)
+                    updateDisplayOrdersAfterDelete(position)
                 }
             }
-        }).start()
+        }
+    }
+
+    private fun updateDisplayOrdersAfterDelete(deletePosition: Int) {
+        for (i in deletePosition until contactsList.size) {
+            contactsList[i].displayOrder = i
+            val finalI = i
+            executor.execute {
+                contactsAppDatabase.getContactDao().updateContact(contactsList[finalI])
+            }
+        }
     }
 
     inner class MainActivityButtonHandler(context: Context) {
         fun onButtonClick(view: View) {
-            binding.fab.setOnClickListener { addAndEditContact(false, null, 0) }
+             addAndEditContact(false, null, 0)
         }
     }
 
@@ -241,13 +245,17 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
     }
 
     override fun onOrderChanged(contacts: List<Contact>) {
-       executor.execute {
-           contacts.forEach { contact ->
-               contactsAppDatabase.getContactDao().updateContact(contact)
-           }
-           handler.post {
-               TODO("Snackbar")
-           }
-       }
+        executor.execute {
+            contacts.forEach { contact ->
+                contactsAppDatabase.getContactDao().updateContact(contact)
+            }
+            handler.post {
+                Snackbar.make(
+                    binding.root,
+                    "Order saved",
+                    Snackbar.LENGTH_SHORT
+                ).show()
+            }
+        }
     }
 }
