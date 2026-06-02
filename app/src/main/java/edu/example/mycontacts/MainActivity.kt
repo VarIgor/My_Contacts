@@ -48,9 +48,12 @@ class MainActivity : AppCompatActivity(), OnContactClickListener {
         binding.buttonHandler = this.buttonHandler
 
         contactsAppDatabase = Room.databaseBuilder(
-            applicationContext, ContactsAppDatabase::
-            class.java, Util.DATABASE_NAME
-        ).build()
+            applicationContext,
+            ContactsAppDatabase::class.java,
+            Util.DATABASE_NAME
+        )
+            .addMigrations(ContactsAppDatabase.MIGRATION_1_2)
+            .build()
 
         getAllContacts()
 
@@ -197,7 +200,6 @@ class MainActivity : AppCompatActivity(), OnContactClickListener {
         }).start()
     }
 
-
     open fun deleteContact(contact: Contact?, position: Int) {
 
         contactsList.removeAt(position)
@@ -235,6 +237,6 @@ class MainActivity : AppCompatActivity(), OnContactClickListener {
         contact: Contact,
         position: Int
     ) {
-       addAndEditContact(true, contact, position)
+        addAndEditContact(true, contact, position)
     }
 }
