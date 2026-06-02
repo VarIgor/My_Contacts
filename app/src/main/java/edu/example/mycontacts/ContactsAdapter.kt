@@ -18,7 +18,8 @@ import java.util.Collections
 
 class ContactsAdapter(
     var contacts: MutableList<Contact>,
-    private val clickListener: OnContactClickListener
+    private val clickListener: OnContactClickListener,
+    private val orderListener: OnOrderChangedListener? = null
 ) :
     Adapter<ContactsAdapter.ContactViewHolder>(), ItemTouchHelpersContract {
 
@@ -29,7 +30,6 @@ class ContactsAdapter(
 
     class ContactViewHolder(var contactListItemBinding: ContactListItemBinding) :
         RecyclerView.ViewHolder(contactListItemBinding.root) {
-
     }
 
 
@@ -67,25 +67,36 @@ class ContactsAdapter(
             }
         }
 
+        val start = minOf(fromPosition, toPosition)
+        val end = maxOf(fromPosition, toPosition)
+        for (i in start..end) {
+            contacts[i].displayOrder = i
+        }
+        val affectedContacts = contacts.subList(start, end + 1).toList()
+        orderListener?.onOrderChanged(affectedContacts)
         notifyItemMoved(fromPosition, toPosition)
-
     }
 
     override fun onItemDismiss(viewHolder: ViewHolder, directory: Int) {
         val position = viewHolder.absoluteAdapterPosition
+        if (position == RecyclerView.NO_POSITION) return
+
         when (directory) {
             ItemTouchHelper.LEFT -> {
                 Log.d("Delete", "Delete item ${contacts[position].firstName}")
-                clickListener.onContactDelete(contacts[position], position)
-                notifyItemRemoved(position)
+                val contact = contacts[position]
+                clickListener.onContactDelete(contact, position)
             }
 
             ItemTouchHelper.RIGHT -> {
                 Log.d("Update", "Update item ${contacts[position].firstName}")
-                clickListener.onContactEdit(contacts[position], position)
-                notifyItemChanged(position)
+                val contact = contacts[position]
+                clickListener.onContactEdit(contact, position)
             }
         }
     }
+}
 
+interface OnOrderChangedListener {
+    fun onOrderChanged(contacts: List<Contact>)
 }
