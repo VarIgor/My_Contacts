@@ -27,7 +27,7 @@ import edu.example.mycontacts.helper.OnContactClickListener
 import edu.example.mycontacts.utils.Util
 import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity(), OnContactClickListener {
+class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChangedListener {
 
     private lateinit var binding: ActivityMainBinding
 
@@ -57,7 +57,7 @@ class MainActivity : AppCompatActivity(), OnContactClickListener {
 
         getAllContacts()
 
-        contactsAdapter = ContactsAdapter(contactsList, this)
+        contactsAdapter = ContactsAdapter(contactsList, this, this)
 
         setupRecyclerView()
 
@@ -238,5 +238,16 @@ class MainActivity : AppCompatActivity(), OnContactClickListener {
         position: Int
     ) {
         addAndEditContact(true, contact, position)
+    }
+
+    override fun onOrderChanged(contacts: List<Contact>) {
+       executor.execute {
+           contacts.forEach { contact ->
+               contactsAppDatabase.getContactDao().updateContact(contact)
+           }
+           handler.post {
+               TODO("Snackbar")
+           }
+       }
     }
 }

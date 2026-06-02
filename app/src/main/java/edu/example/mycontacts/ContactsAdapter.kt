@@ -18,7 +18,8 @@ import java.util.Collections
 
 class ContactsAdapter(
     var contacts: MutableList<Contact>,
-    private val clickListener: OnContactClickListener
+    private val clickListener: OnContactClickListener,
+    private val orderListener: OnOrderChangedListener? = null
 ) :
     Adapter<ContactsAdapter.ContactViewHolder>(), ItemTouchHelpersContract {
 
@@ -29,7 +30,6 @@ class ContactsAdapter(
 
     class ContactViewHolder(var contactListItemBinding: ContactListItemBinding) :
         RecyclerView.ViewHolder(contactListItemBinding.root) {
-
     }
 
 
@@ -67,6 +67,12 @@ class ContactsAdapter(
             }
         }
 
+        contacts.forEachIndexed { index, contact ->
+            contact.displayOrder = index
+        }
+
+        orderListener?.onOrderChanged(contacts)
+
         notifyItemMoved(fromPosition, toPosition)
 
     }
@@ -87,4 +93,8 @@ class ContactsAdapter(
             }
         }
     }
+}
+
+interface OnOrderChangedListener {
+    fun onOrderChanged(contacts: List<Contact>)
 }
