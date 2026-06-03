@@ -6,7 +6,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import edu.example.mycontacts.model.Contact
 
-@Database(entities = [Contact::class], version = 2)
+@Database(entities = [Contact::class], version = 2, exportSchema = false)
 abstract class ContactsAppDatabase: RoomDatabase() {
 
     abstract fun getContactDao():ContactDao

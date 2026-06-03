@@ -19,11 +19,10 @@ import java.util.Collections
 class ContactsAdapter(
     var contacts: MutableList<Contact>,
     private val clickListener: OnContactClickListener,
-    private val orderListener: OnOrderChangedListener? = null
-) :
-    Adapter<ContactsAdapter.ContactViewHolder>(), ItemTouchHelpersContract {
+    private val orderListener: OnOrderChangedListener
+) : Adapter<ContactsAdapter.ContactViewHolder>(), ItemTouchHelpersContract {
 
-    public fun setContact(contacts: MutableList<Contact>) {
+    fun setContact(contacts: MutableList<Contact>) {
         this.contacts = contacts
     }
 
@@ -67,14 +66,14 @@ class ContactsAdapter(
             }
         }
 
-        val start = minOf(fromPosition, toPosition)
-        val end = maxOf(fromPosition, toPosition)
-        for (i in start..end) {
-            contacts[i].displayOrder = i
+        contacts.forEachIndexed { index, contact ->
+            contact.displayOrder = index
         }
-        val affectedContacts = contacts.subList(start, end + 1).toList()
-        orderListener?.onOrderChanged(affectedContacts)
         notifyItemMoved(fromPosition, toPosition)
+    }
+
+    override fun onDragFinished() {
+        saveOrderToDatabase()
     }
 
     override fun onItemDismiss(viewHolder: ViewHolder, directory: Int) {
@@ -94,6 +93,10 @@ class ContactsAdapter(
                 clickListener.onContactEdit(contact, position)
             }
         }
+    }
+
+    fun saveOrderToDatabase(){
+        orderListener?.onOrderChanged(contacts)
     }
 }
 

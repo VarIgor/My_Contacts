@@ -8,4 +8,5 @@ import edu.example.mycontacts.ContactsAdapter
 interface ItemTouchHelpersContract {
     fun onRowMoved(fromPosition: Int, toPosition: Int)
     fun onItemDismiss(viewHolder: ViewHolder, directory: Int)
+    fun onDragFinished()
 }

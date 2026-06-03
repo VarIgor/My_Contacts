@@ -6,23 +6,24 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
 import edu.example.mycontacts.model.Contact
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ContactDao {
 
     @Insert
-     fun addContact(contact: Contact): Long
+    suspend fun addContact(contact: Contact): Long
 
     @Update
-     fun updateContact(contact: Contact)
+    suspend fun updateContact(contact: Contact)
 
     @Delete
-     fun deleteContact(contact: Contact)
+    suspend fun deleteContact(contact: Contact)
 
     @Query("SELECT * FROM contacts ORDER BY display_order ASC")
-     fun getAllContacts(): MutableList<Contact>
+    fun getAllContacts(): Flow<List<Contact>>
 
     @Query("select * from contacts where contact_id ==:contactId")
-     fun getContact(contactId: Long): Contact
+    suspend fun getContact(contactId: Long): Contact
 
 }

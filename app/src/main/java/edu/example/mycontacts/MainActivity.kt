@@ -3,8 +3,6 @@ package edu.example.mycontacts
 import android.content.Context
 import android.content.DialogInterface
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
@@ -20,13 +18,18 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.room.Room
 import com.google.android.material.snackbar.Snackbar
+import edu.example.mycontacts.data.ContactRepository
 import edu.example.mycontacts.data.ContactsAppDatabase
 import edu.example.mycontacts.databinding.ActivityMainBinding
 import edu.example.mycontacts.model.Contact
 import edu.example.mycontacts.helper.ItemMoveCallback
 import edu.example.mycontacts.helper.OnContactClickListener
 import edu.example.mycontacts.utils.Util
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChangedListener {
 
@@ -37,9 +40,9 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
     private var contactsList = mutableListOf<Contact>()
     private lateinit var contactsAdapter: ContactsAdapter
     private lateinit var contactsAppDatabase: ContactsAppDatabase
+    private lateinit var contactRepository: ContactRepository
 
-    private val executor = Executors.newSingleThreadExecutor()
-    private val handler = Handler(Looper.getMainLooper())
+    private val coroutineScope = CoroutineScope(Dispatchers.Main + Job())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +59,8 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
             .addMigrations(ContactsAppDatabase.MIGRATION_1_2)
             .build()
 
+        contactRepository = ContactRepository(contactsAppDatabase.getContactDao())
+
         getAllContacts()
 
         contactsAdapter = ContactsAdapter(contactsList, this, this)
@@ -66,6 +71,11 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
         val touchHelper = ItemTouchHelper(callback)
         touchHelper.attachToRecyclerView(recyclerView)
 
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        coroutineScope.cancel()
     }
 
     private fun setupRecyclerView() {
@@ -152,74 +162,45 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
     }
 
     fun createContact(contact: Contact) {
-        contact.displayOrder = contactsList.size
-        executor.execute {
-            val id = contactsAppDatabase.getContactDao().addContact(contact)
-            val newContact = contactsAppDatabase.getContactDao().getContact(id)
-            handler.post {
-                if (newContact != null) {
-                    contactsList.add(newContact)
-                    contactsAdapter.notifyItemInserted(contactsList.size - 1)
-                }
-            }
+        coroutineScope.launch {
+            val newOrder = contactsList.size
+            contact.displayOrder = newOrder
+            val id = contactRepository.addContact(contact)
         }
     }
 
     fun getAllContacts() {
-        executor.execute {
-            contactsList = contactsAppDatabase.getContactDao().getAllContacts()
-            handler.post {
+        coroutineScope.launch {
+            contactRepository.getAllContacts().collect { contacts ->
+                contactsList = contacts.toMutableList()
                 contactsAdapter.setContact(contactsList)
                 contactsAdapter.notifyDataSetChanged()
             }
         }
-
     }
 
-    open fun updateContact(contact: Contact, position: Int) {
-
-        val updateContact = contactsList[position]
-        updateContact.firstName = contact.firstName
-        updateContact.lastName = contact.lastName
-        updateContact.email = contact.email
-        updateContact.phoneNumber = contact.phoneNumber
-
-        executor.execute {
-            contactsAppDatabase.getContactDao().updateContact(updateContact)
-            handler.post {
-                contactsAdapter.notifyItemChanged(position)
-            }
+    fun updateContact(contact: Contact, position: Int) {
+        coroutineScope.launch {
+            val updateContact = contactsList[position]
+            updateContact.firstName = contact.firstName
+            updateContact.lastName = contact.lastName
+            updateContact.email = contact.email
+            updateContact.phoneNumber = contact.phoneNumber
+            contactRepository.updateContact(updateContact)
         }
     }
 
-    open fun deleteContact(contact: Contact?, position: Int) {
-        val contactToDelete = contact ?: return
-
-        executor.execute {
-            contactsAppDatabase.getContactDao().deleteContact(contactToDelete)
-            handler.post {
-                if (position < contactsList.size && contactsList[position].id == contactToDelete.id) {
-                    contactsList.removeAt(position)
-                    contactsAdapter.notifyItemRemoved(position)
-                    updateDisplayOrdersAfterDelete(position)
-                }
-            }
-        }
-    }
-
-    private fun updateDisplayOrdersAfterDelete(deletePosition: Int) {
-        for (i in deletePosition until contactsList.size) {
-            contactsList[i].displayOrder = i
-            val finalI = i
-            executor.execute {
-                contactsAppDatabase.getContactDao().updateContact(contactsList[finalI])
+    fun deleteContact(contact: Contact?, position: Int) {
+        coroutineScope.launch {
+            contact?.let {
+                contactRepository.deleteContact(it)
             }
         }
     }
 
     inner class MainActivityButtonHandler(context: Context) {
         fun onButtonClick(view: View) {
-             addAndEditContact(false, null, 0)
+            addAndEditContact(false, null, 0)
         }
     }
 
@@ -245,17 +226,13 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
     }
 
     override fun onOrderChanged(contacts: List<Contact>) {
-        executor.execute {
-            contacts.forEach { contact ->
-                contactsAppDatabase.getContactDao().updateContact(contact)
-            }
-            handler.post {
-                Snackbar.make(
-                    binding.root,
-                    "Order saved",
-                    Snackbar.LENGTH_SHORT
-                ).show()
-            }
+        coroutineScope.launch {
+            contactRepository.updateContactsOrder(contacts)
+            Snackbar.make(
+                binding.root,
+                "Порядок сохранён",
+                Snackbar.LENGTH_SHORT
+            ).show()
         }
     }
 }

@@ -2,7 +2,6 @@ package edu.example.mycontacts.helper
 
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
-import edu.example.mycontacts.ContactsAdapter
 
 class ItemMoveCallback(val adapter: ItemTouchHelpersContract) : ItemTouchHelper.Callback() {
 
@@ -38,4 +37,8 @@ class ItemMoveCallback(val adapter: ItemTouchHelpersContract) : ItemTouchHelper.
         mAdapter.onItemDismiss(viewHolder, direction)
     }
 
+    override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder){
+        super.clearView(recyclerView, viewHolder)
+        adapter.onDragFinished()
+    }
 }
