@@ -22,8 +22,12 @@ class ContactsAdapter(
     private val orderListener: OnOrderChangedListener
 ) : Adapter<ContactsAdapter.ContactViewHolder>(), ItemTouchHelpersContract {
 
+    private var isDragging = false
+    private var swipedPosition = -1
+
     fun setContact(contacts: MutableList<Contact>) {
         this.contacts = contacts
+        notifyDataSetChanged()
     }
 
 
@@ -49,13 +53,16 @@ class ContactsAdapter(
         val contact = contacts[position]
 
         holder.contactListItemBinding.contact = contact
-
+        holder.contactListItemBinding.executePendingBindings()
         holder.itemView.setOnClickListener {
-            clickListener.onContactClick(contact, position)
+            if (!isDragging) {
+                clickListener.onContactClick(contact, position)
+            }
         }
     }
 
     override fun onRowMoved(fromPosition: Int, toPosition: Int) {
+        if (fromPosition == toPosition) return
         if (fromPosition < toPosition) {
             for (i in fromPosition until toPosition) {
                 Collections.swap(contacts, i, i + 1)
@@ -73,6 +80,7 @@ class ContactsAdapter(
     }
 
     override fun onDragFinished() {
+        isDragging = false
         saveOrderToDatabase()
     }
 
@@ -90,13 +98,14 @@ class ContactsAdapter(
             ItemTouchHelper.RIGHT -> {
                 Log.d("Update", "Update item ${contacts[position].firstName}")
                 val contact = contacts[position]
+                notifyItemChanged(position)
                 clickListener.onContactEdit(contact, position)
             }
         }
     }
 
     fun saveOrderToDatabase(){
-        orderListener?.onOrderChanged(contacts)
+        orderListener.onOrderChanged(contacts)
     }
 }
 

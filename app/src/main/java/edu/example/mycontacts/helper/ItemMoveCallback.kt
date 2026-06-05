@@ -5,8 +5,6 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ItemMoveCallback(val adapter: ItemTouchHelpersContract) : ItemTouchHelper.Callback() {
 
-    val mAdapter = adapter
-
     override fun isLongPressDragEnabled(): Boolean {
         return true
     }
@@ -29,12 +27,17 @@ class ItemMoveCallback(val adapter: ItemTouchHelpersContract) : ItemTouchHelper.
         viewHolder: RecyclerView.ViewHolder,
         target: RecyclerView.ViewHolder
     ): Boolean {
-        mAdapter.onRowMoved(viewHolder.absoluteAdapterPosition, target.absoluteAdapterPosition)
+        val fromPosition = viewHolder.absoluteAdapterPosition
+        val toPosition = target.absoluteAdapterPosition
+
+        if (fromPosition == toPosition) return false
+
+        adapter.onRowMoved(fromPosition, toPosition)
         return true
     }
 
     override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-        mAdapter.onItemDismiss(viewHolder, direction)
+        adapter.onItemDismiss(viewHolder, direction)
     }
 
     override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder){
