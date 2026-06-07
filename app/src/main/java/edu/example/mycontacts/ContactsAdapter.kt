@@ -15,7 +15,6 @@ import edu.example.mycontacts.helper.ItemTouchHelpersContract
 import edu.example.mycontacts.helper.OnContactClickListener
 import java.util.Collections
 
-
 class ContactsAdapter(
     var contacts: MutableList<Contact>,
     private val clickListener: OnContactClickListener,
@@ -23,18 +22,15 @@ class ContactsAdapter(
 ) : Adapter<ContactsAdapter.ContactViewHolder>(), ItemTouchHelpersContract {
 
     private var isDragging = false
-    private var swipedPosition = -1
 
     fun setContact(contacts: MutableList<Contact>) {
         this.contacts = contacts
         notifyDataSetChanged()
     }
 
-
     class ContactViewHolder(var contactListItemBinding: ContactListItemBinding) :
-        RecyclerView.ViewHolder(contactListItemBinding.root) {
+        ViewHolder(contactListItemBinding.root) {
     }
-
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ContactViewHolder {
 
@@ -56,7 +52,7 @@ class ContactsAdapter(
         holder.contactListItemBinding.executePendingBindings()
         holder.itemView.setOnClickListener {
             if (!isDragging) {
-                clickListener.onContactClick(contact, position)
+                clickListener.onContactClick(contact)
             }
         }
     }
@@ -81,7 +77,7 @@ class ContactsAdapter(
 
     override fun onDragFinished() {
         isDragging = false
-        saveOrderToDatabase()
+        orderListener.onOrderChanged(contacts)
     }
 
     override fun onItemDismiss(viewHolder: ViewHolder, directory: Int) {
@@ -92,20 +88,16 @@ class ContactsAdapter(
             ItemTouchHelper.LEFT -> {
                 Log.d("Delete", "Delete item ${contacts[position].firstName}")
                 val contact = contacts[position]
-                clickListener.onContactDelete(contact, position)
+                clickListener.onContactDelete(contact)
             }
 
             ItemTouchHelper.RIGHT -> {
                 Log.d("Update", "Update item ${contacts[position].firstName}")
                 val contact = contacts[position]
                 notifyItemChanged(position)
-                clickListener.onContactEdit(contact, position)
+                clickListener.onContactEdit(contact)
             }
         }
-    }
-
-    fun saveOrderToDatabase(){
-        orderListener.onOrderChanged(contacts)
     }
 }
 
