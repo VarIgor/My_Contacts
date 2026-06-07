@@ -1,7 +1,5 @@
 package edu.example.mycontacts
 
-import android.content.Context
-import android.content.DialogInterface
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.LayoutInflater
@@ -12,6 +10,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -24,34 +24,25 @@ import edu.example.mycontacts.databinding.ActivityMainBinding
 import edu.example.mycontacts.model.Contact
 import edu.example.mycontacts.helper.ItemMoveCallback
 import edu.example.mycontacts.helper.OnContactClickListener
+import edu.example.mycontacts.ui.viewmodel.ContactViewModel
+import edu.example.mycontacts.ui.viewmodel.ContactViewModelFactory
 import edu.example.mycontacts.utils.Util
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChangedListener {
 
     private lateinit var binding: ActivityMainBinding
-
-    private lateinit var buttonHandler: MainActivityButtonHandler
-    private lateinit var recyclerView: RecyclerView
-    private var contactsList = mutableListOf<Contact>()
     private lateinit var contactsAdapter: ContactsAdapter
-    private lateinit var contactsAppDatabase: ContactsAppDatabase
-    private lateinit var contactRepository: ContactRepository
-
-    private val coroutineScope = CoroutineScope(Dispatchers.Main + Job())
+    private lateinit var viewModel: ContactViewModel
+    private lateinit var recyclerView: RecyclerView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
-        buttonHandler = MainActivityButtonHandler(this)
-        binding.buttonHandler = this.buttonHandler
+        binding.buttonHandler = MainActivityButtonHandler()
 
-        contactsAppDatabase = Room.databaseBuilder(
+        val database = Room.databaseBuilder(
             applicationContext,
             ContactsAppDatabase::class.java,
             Util.DATABASE_NAME
@@ -59,11 +50,12 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
             .addMigrations(ContactsAppDatabase.MIGRATION_1_2)
             .build()
 
-        contactRepository = ContactRepository(contactsAppDatabase.getContactDao())
+        val repository = ContactRepository(database.getContactDao())
 
-        getAllContacts()
+        val factory = ContactViewModelFactory(repository)
+        viewModel = ViewModelProvider(this, factory)[ContactViewModel::class.java]
 
-        contactsAdapter = ContactsAdapter(contactsList, this, this)
+        contactsAdapter = ContactsAdapter(mutableListOf(), this, this)
 
         setupRecyclerView()
 
@@ -71,35 +63,40 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
         val touchHelper = ItemTouchHelper(callback)
         touchHelper.attachToRecyclerView(recyclerView)
 
-    }
+        lifecycleScope.launch {
+            viewModel.contacts.collect { contacts ->
+                contactsAdapter.setContact(contacts.toMutableList())
+            }
+        }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        coroutineScope.cancel()
+        lifecycleScope.launch {
+            viewModel.snackbarMessage.collect { message ->
+                message?.let {
+                    Snackbar.make(binding.root, it, Snackbar.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private fun setupRecyclerView() {
         recyclerView = binding.recyclerView
-        recyclerView.layoutManager = LinearLayoutManager(applicationContext)
+        recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.itemAnimator = DefaultItemAnimator()
         recyclerView.setHasFixedSize(true)
         recyclerView.adapter = contactsAdapter
     }
 
-    fun addAndEditContact(isUpdate: Boolean, contact: Contact?, position: Int) {
-        val layoutInflaterAndroid = LayoutInflater.from(applicationContext)
-        val view = layoutInflaterAndroid.inflate(R.layout.layout_add_contact, null)
+    fun showAddEditDialog(isUpdate: Boolean, contact: Contact?) {
+        val inflater = LayoutInflater.from(this)
+        val view = inflater.inflate(R.layout.layout_add_contact, null)
 
-        val alertDialogBuilderUserInput = AlertDialog.Builder(this)
-        alertDialogBuilderUserInput.setView(view)
-
-        val newContact = view.findViewById<TextView>(R.id.addContactTitle)
+        val dialogTitle = view.findViewById<TextView>(R.id.addContactTitle)
         val firstNameEdit = view.findViewById<EditText>(R.id.firstNameEditText)
         val lastNameEdit = view.findViewById<EditText>(R.id.lastNameEditText)
         val emailEdit = view.findViewById<EditText>(R.id.emailEditText)
         val phoneNumberEdit = view.findViewById<EditText>(R.id.phoneNumberEditText)
 
-        newContact.text = if (!isUpdate) "Add contact" else "Edit contact"
+        dialogTitle.text = if (!isUpdate) "Add contact" else "Edit contact"
 
         if (isUpdate && contact != null) {
             firstNameEdit.setText(contact.firstName)
@@ -108,131 +105,68 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
             phoneNumberEdit.setText(contact.phoneNumber)
         }
 
-        alertDialogBuilderUserInput.setCancelable(false)
-            .setPositiveButton(
-                if (isUpdate) "Update" else "Save",
-                DialogInterface.OnClickListener { dialog, which -> })
-            .setNegativeButton(
-                "Cancel",
-                DialogInterface.OnClickListener { dialog, which -> dialog.cancel() })
+        val dialog = AlertDialog.Builder(this)
+            .setView(view)
+            .setCancelable(false)
+            .setPositiveButton(if (isUpdate) "Update" else "Save", null)
+            .setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
+            .create()
+        dialog.show()
 
-        val alertDialog = alertDialogBuilderUserInput.create()
-        alertDialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val firstName = firstNameEdit.text.toString()
+            val lastName = lastNameEdit.text.toString()
+            val email = emailEdit.text.toString()
+            val phoneNumber = phoneNumberEdit.text.toString()
 
-        alertDialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            if (TextUtils.isEmpty(firstNameEdit.text.toString())) {
-                Toast.makeText(this, "Enter first name please.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            } else if (TextUtils.isEmpty(lastNameEdit.text.toString())) {
-                Toast.makeText(this, "Enter last name please.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            } else if (TextUtils.isEmpty(emailEdit.text.toString())) {
-                Toast.makeText(this, "Enter email please.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            } else if (TextUtils.isEmpty(phoneNumberEdit.text.toString())) {
-                Toast.makeText(this, "Enter phone number please.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            } else {
-                alertDialog.dismiss()
-            }
-
-            if (isUpdate && contact != null) {
-                updateContact(
-                    Contact(
-                        0,
-                        firstNameEdit.text.toString(),
-                        lastNameEdit.text.toString(),
-                        emailEdit.text.toString(),
-                        phoneNumberEdit.text.toString()
-                    ), position
-                )
-            } else {
-                createContact(
-                    Contact(
-                        0,
-                        firstNameEdit.text.toString(),
-                        lastNameEdit.text.toString(),
-                        emailEdit.text.toString(),
-                        phoneNumberEdit.text.toString()
-                    )
-                )
-            }
-        }
-
-    }
-
-    fun createContact(contact: Contact) {
-        coroutineScope.launch {
-            val newOrder = contactsList.size
-            contact.displayOrder = newOrder
-            val id = contactRepository.addContact(contact)
-        }
-    }
-
-    fun getAllContacts() {
-        coroutineScope.launch {
-            contactRepository.getAllContacts().collect { contacts ->
-                contactsList = contacts.toMutableList()
-                contactsAdapter.setContact(contactsList)
-                contactsAdapter.notifyDataSetChanged()
+            when {
+                TextUtils.isEmpty(firstName) -> toast("Enter first name")
+                TextUtils.isEmpty(lastName) -> toast("Enter last name")
+                TextUtils.isEmpty(email) -> toast("Enter email")
+                TextUtils.isEmpty(phoneNumber) -> toast("Enter phone number")
+                else -> {
+                    dialog.dismiss()
+                    if (isUpdate && contact != null) {
+                        val updateContact = Contact(
+                            id = contact.id,
+                            firstName = firstName,
+                            lastName = lastName,
+                            email = email,
+                            phoneNumber = phoneNumber
+                        )
+                        updateContact.displayOrder = contact.displayOrder
+                        viewModel.updateContact(updateContact)
+                    } else {
+                        viewModel.createContact(firstName, lastName, email, phoneNumber)
+                    }
+                }
             }
         }
     }
 
-    fun updateContact(contact: Contact, position: Int) {
-        coroutineScope.launch {
-            val updateContact = contactsList[position]
-            updateContact.firstName = contact.firstName
-            updateContact.lastName = contact.lastName
-            updateContact.email = contact.email
-            updateContact.phoneNumber = contact.phoneNumber
-            contactRepository.updateContact(updateContact)
-        }
+    private fun toast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
-    fun deleteContact(contact: Contact?, position: Int) {
-        coroutineScope.launch {
-            contact?.let {
-                contactRepository.deleteContact(it)
-            }
-        }
+    override fun onContactClick(contact: Contact) {
+        showAddEditDialog(true, contact)
     }
 
-    inner class MainActivityButtonHandler(context: Context) {
-        fun onButtonClick(view: View) {
-            addAndEditContact(false, null, 0)
-        }
+    override fun onContactDelete(contact: Contact) {
+        viewModel.deleteContact(contact)
     }
 
-    override fun onContactClick(
-        contact: Contact,
-        position: Int
-    ) {
-        addAndEditContact(true, contact, position)
-    }
-
-    override fun onContactDelete(
-        contact: Contact,
-        position: Int
-    ) {
-        deleteContact(contact, position)
-    }
-
-    override fun onContactEdit(
-        contact: Contact,
-        position: Int
-    ) {
-        addAndEditContact(true, contact, position)
+    override fun onContactEdit(contact: Contact) {
+        showAddEditDialog(true, contact)
     }
 
     override fun onOrderChanged(contacts: List<Contact>) {
-        coroutineScope.launch {
-            contactRepository.updateContactsOrder(contacts)
-            Snackbar.make(
-                binding.root,
-                "Порядок сохранён",
-                Snackbar.LENGTH_SHORT
-            ).show()
+        viewModel.updateContactsOrder(contacts)
+    }
+
+    inner class MainActivityButtonHandler() {
+        fun onButtonClick(view: View) {
+            showAddEditDialog(false, null)
         }
     }
 }
