@@ -1,13 +1,7 @@
 package edu.example.mycontacts
 
 import android.os.Bundle
-import android.text.TextUtils
-import android.view.LayoutInflater
 import android.view.View
-import android.widget.EditText
-import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.ViewModelProvider
@@ -24,6 +18,7 @@ import edu.example.mycontacts.databinding.ActivityMainBinding
 import edu.example.mycontacts.model.Contact
 import edu.example.mycontacts.helper.ItemMoveCallback
 import edu.example.mycontacts.helper.OnContactClickListener
+import edu.example.mycontacts.ui.dialogs.AddEditContactDialog
 import edu.example.mycontacts.ui.viewmodel.ContactViewModel
 import edu.example.mycontacts.ui.viewmodel.ContactViewModelFactory
 import edu.example.mycontacts.utils.Util
@@ -35,6 +30,7 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
     private lateinit var contactsAdapter: ContactsAdapter
     private lateinit var viewModel: ContactViewModel
     private lateinit var recyclerView: RecyclerView
+    private var undoSnackbar: Snackbar? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,12 +47,10 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
             .build()
 
         val repository = ContactRepository(database.getContactDao())
-
         val factory = ContactViewModelFactory(repository)
         viewModel = ViewModelProvider(this, factory)[ContactViewModel::class.java]
 
         contactsAdapter = ContactsAdapter(mutableListOf(), this, this)
-
         setupRecyclerView()
 
         val callback = ItemMoveCallback(contactsAdapter)
@@ -70,12 +64,39 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
         }
 
         lifecycleScope.launch {
-            viewModel.snackbarMessage.collect { message ->
+            viewModel.showUndoSnackbar.collect { contact ->
+                contact?.let { showUndoSnackbar(it) }
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.simpleMessage.collect { message ->
                 message?.let {
                     Snackbar.make(binding.root, it, Snackbar.LENGTH_SHORT).show()
                 }
             }
         }
+    }
+
+    private fun showUndoSnackbar(contact: Contact) {
+        undoSnackbar?.dismiss()
+
+        undoSnackbar = Snackbar.make(
+            binding.root,
+            "Контакт будет удалён",
+            Snackbar.LENGTH_LONG
+        ).setAction("Отменить") {
+            viewModel.undoDelete(contact)
+            undoSnackbar = null
+        }
+
+        undoSnackbar?.addCallback(object : Snackbar.Callback() {
+            override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
+                super.onDismissed(transientBottomBar, event)
+                undoSnackbar = null
+            }
+        })
+        undoSnackbar?.show()
     }
 
     private fun setupRecyclerView() {
@@ -87,65 +108,24 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
     }
 
     fun showAddEditDialog(isUpdate: Boolean, contact: Contact?) {
-        val inflater = LayoutInflater.from(this)
-        val view = inflater.inflate(R.layout.layout_add_contact, null)
-
-        val dialogTitle = view.findViewById<TextView>(R.id.addContactTitle)
-        val firstNameEdit = view.findViewById<EditText>(R.id.firstNameEditText)
-        val lastNameEdit = view.findViewById<EditText>(R.id.lastNameEditText)
-        val emailEdit = view.findViewById<EditText>(R.id.emailEditText)
-        val phoneNumberEdit = view.findViewById<EditText>(R.id.phoneNumberEditText)
-
-        dialogTitle.text = if (!isUpdate) "Add contact" else "Edit contact"
-
-        if (isUpdate && contact != null) {
-            firstNameEdit.setText(contact.firstName)
-            lastNameEdit.setText(contact.lastName)
-            emailEdit.setText(contact.email)
-            phoneNumberEdit.setText(contact.phoneNumber)
-        }
-
-        val dialog = AlertDialog.Builder(this)
-            .setView(view)
-            .setCancelable(false)
-            .setPositiveButton(if (isUpdate) "Update" else "Save", null)
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.cancel() }
-            .create()
-        dialog.show()
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-            val firstName = firstNameEdit.text.toString()
-            val lastName = lastNameEdit.text.toString()
-            val email = emailEdit.text.toString()
-            val phoneNumber = phoneNumberEdit.text.toString()
-
-            when {
-                TextUtils.isEmpty(firstName) -> toast("Enter first name")
-                TextUtils.isEmpty(lastName) -> toast("Enter last name")
-                TextUtils.isEmpty(email) -> toast("Enter email")
-                TextUtils.isEmpty(phoneNumber) -> toast("Enter phone number")
-                else -> {
-                    dialog.dismiss()
-                    if (isUpdate && contact != null) {
-                        val updateContact = Contact(
-                            id = contact.id,
-                            firstName = firstName,
-                            lastName = lastName,
-                            email = email,
-                            phoneNumber = phoneNumber
-                        )
-                        updateContact.displayOrder = contact.displayOrder
-                        viewModel.updateContact(updateContact)
-                    } else {
-                        viewModel.createContact(firstName, lastName, email, phoneNumber)
-                    }
+        val dialog = AddEditContactDialog(this, isUpdate, contact)
+        dialog.show(
+            onSave = { firstName, lastName, email, phoneNumber ->
+                if (isUpdate && contact != null) {
+                    val updateContact = Contact(
+                        id = contact.id,
+                        firstName = firstName,
+                        lastName = lastName,
+                        email = email,
+                        phoneNumber = phoneNumber
+                    )
+                    updateContact.displayOrder = contact.displayOrder
+                    viewModel.updateContact(updateContact)
+                } else {
+                    viewModel.createContact(firstName, lastName, email, phoneNumber)
                 }
             }
-        }
-    }
-
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        )
     }
 
     override fun onContactClick(contact: Contact) {
