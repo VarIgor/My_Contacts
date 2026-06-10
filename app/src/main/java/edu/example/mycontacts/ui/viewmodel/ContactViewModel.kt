@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import edu.example.mycontacts.data.ContactRepository
 import edu.example.mycontacts.model.Contact
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,11 +15,19 @@ import kotlinx.coroutines.launch
 class ContactViewModel(
     private val repository: ContactRepository
 ) : ViewModel() {
+
     private val _contacts = MutableStateFlow<List<Contact>>(emptyList())
     val contacts: StateFlow<List<Contact>> = _contacts.asStateFlow()
 
-    private val _snackbarMessage = MutableStateFlow<String?>(null)
-    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
+    private val _showUndoSnackbar = MutableStateFlow<Contact?>(null)
+    val showUndoSnackbar: StateFlow<Contact?> = _showUndoSnackbar.asStateFlow()
+
+    private val _simpleMessage = MutableStateFlow<String?>(null)
+    val simpleMessage: StateFlow<String?> = _simpleMessage.asStateFlow()
+
+    private var deleteJob: Job? = null
+    private var pendingDeleteContact: Contact? = null
+    private var isUndoActive = false
 
     init {
         loadContacts()
@@ -26,7 +36,9 @@ class ContactViewModel(
     fun loadContacts() {
         viewModelScope.launch {
             repository.getAllContacts().collectLatest { contactsList ->
-                _contacts.value = contactsList
+                if (!isUndoActive) {
+                    _contacts.value = contactsList
+                }
             }
         }
     }
@@ -48,38 +60,68 @@ class ContactViewModel(
             )
             newContact.displayOrder = currentSize
             repository.addContact(newContact)
-            _snackbarMessage.value = "Контакт добавлен"
-            clearSnackbarMessage()
+            showSimpleMessage("Контакт добавлен")
         }
     }
 
     fun updateContact(contact: Contact) {
         viewModelScope.launch {
             repository.updateContact(contact)
-            _snackbarMessage.value = "Контакт обновлён"
-            clearSnackbarMessage()
+            showSimpleMessage("Контакт обновлён")
         }
     }
 
-    fun deleteContact(contact: Contact) {
-        viewModelScope.launch {
-            repository.deleteContact(contact)
-            _snackbarMessage.value = "Контакт удалён"
-            clearSnackbarMessage()
+    fun deleteContact(contact: Contact, showUndo: Boolean = true) {
+        deleteJob?.cancel()
+
+        pendingDeleteContact = contact
+        isUndoActive = true
+        _contacts.value = _contacts.value.filter { it.id != contact.id }
+        _showUndoSnackbar.value = contact
+
+        deleteJob = viewModelScope.launch {
+            delay(3000)
+            pendingDeleteContact?.let { contactToDelete ->
+                repository.deleteContact(contactToDelete)
+                showSimpleMessage("Контакт удалён")
+                pendingDeleteContact = null
+            }
+            _showUndoSnackbar.value = null
+            isUndoActive = false
         }
     }
 
-    fun updateContactsOrder(contacts: List<Contact>){
+    fun undoDelete(contact: Contact) {
+        deleteJob?.cancel()
+        deleteJob = null
+
+        _showUndoSnackbar.value = null
+
+        isUndoActive = false
+        loadContacts()
+        pendingDeleteContact = null
+        showSimpleMessage("Удаление отменено")
+    }
+
+    fun updateContactsOrder(contacts: List<Contact>) {
         viewModelScope.launch {
             repository.updateContactsOrder(contacts)
-            _snackbarMessage.value = "Порядок сохранён"
+            _contacts.value = contacts
         }
     }
 
-    private fun clearSnackbarMessage() {
+    private fun showSimpleMessage(message: String) {
+        _simpleMessage.value = message
         viewModelScope.launch {
-            kotlinx.coroutines.delay(2000)
-            _snackbarMessage.value = null
+            delay(2000)
+            if (_simpleMessage.value == message) {
+                _simpleMessage.value = null
+            }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        deleteJob?.cancel()
     }
 }
