@@ -16,6 +16,7 @@ class ContactViewModel(
     private val repository: ContactRepository
 ) : ViewModel() {
 
+    private val _allContacts = MutableStateFlow<List<Contact>>(emptyList())
     private val _contacts = MutableStateFlow<List<Contact>>(emptyList())
     val contacts: StateFlow<List<Contact>> = _contacts.asStateFlow()
 
@@ -28,6 +29,7 @@ class ContactViewModel(
     private var deleteJob: Job? = null
     private var pendingDeleteContact: Contact? = null
     private var isUndoActive = false
+    private var currentQuery = ""
 
     init {
         loadContacts()
@@ -37,7 +39,8 @@ class ContactViewModel(
         viewModelScope.launch {
             repository.getAllContacts().collectLatest { contactsList ->
                 if (!isUndoActive) {
-                    _contacts.value = contactsList
+                    _allContacts.value = contactsList
+                    filterContacts(currentQuery)
                 }
             }
         }
@@ -50,7 +53,7 @@ class ContactViewModel(
         phoneNumber: String,
     ) {
         viewModelScope.launch {
-            val currentSize = _contacts.value.size
+            val currentSize = _allContacts.value.size
             val newContact = Contact(
                 id = 0,
                 firstName = firstName,
@@ -71,7 +74,7 @@ class ContactViewModel(
         }
     }
 
-    fun deleteContact(contact: Contact, showUndo: Boolean = true) {
+    fun deleteContact(contact: Contact) {
         deleteJob?.cancel()
 
         pendingDeleteContact = contact
@@ -94,11 +97,20 @@ class ContactViewModel(
     fun undoDelete(contact: Contact) {
         deleteJob?.cancel()
         deleteJob = null
-
         _showUndoSnackbar.value = null
-
         isUndoActive = false
-        loadContacts()
+
+        val allList = _allContacts.value.toMutableList()
+        val allPosition = allList.indexOfFirst { it.displayOrder > contact.displayOrder }
+        if (allPosition >= 0) {
+            allList.add(allPosition, contact)
+        } else {
+            allList.add(contact)
+        }
+        _allContacts.value = allList
+
+        filterContacts(currentQuery)
+
         pendingDeleteContact = null
         showSimpleMessage("Удаление отменено")
     }
@@ -106,7 +118,27 @@ class ContactViewModel(
     fun updateContactsOrder(contacts: List<Contact>) {
         viewModelScope.launch {
             repository.updateContactsOrder(contacts)
-            _contacts.value = contacts
+            _allContacts.value = contacts
+            filterContacts(currentQuery)
+        }
+    }
+
+    fun searchContacts(query: String) {
+        currentQuery = query
+        filterContacts(query)
+    }
+
+    private fun filterContacts(query: String) {
+        if (query.isBlank()) {
+            _contacts.value = _allContacts.value
+        } else {
+            val filtered = _allContacts.value.filter { contact ->
+                contact.firstName.contains(query, ignoreCase = true) ||
+                contact.lastName.contains(query, ignoreCase = true) ||
+                contact.email.contains(query, ignoreCase = true) ||
+                contact.phoneNumber.contains(query, ignoreCase = true)
+            }
+            _contacts.value = filtered
         }
     }
 

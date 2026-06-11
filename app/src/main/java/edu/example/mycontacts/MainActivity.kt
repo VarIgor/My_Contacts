@@ -1,8 +1,8 @@
 package edu.example.mycontacts
 
 import android.os.Bundle
-import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -76,6 +76,26 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
                 }
             }
         }
+
+        setupSearchView()
+    }
+
+    private fun setupSearchView() {
+        binding.searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                query?.let { viewModel.searchContacts(it) }
+                return true
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                viewModel.searchContacts(newText ?: "")
+                return true
+            }
+        })
+        binding.searchView.setOnCloseListener {
+            viewModel.searchContacts("")
+            false
+        }
     }
 
     private fun showUndoSnackbar(contact: Contact) {
@@ -107,7 +127,7 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
         recyclerView.adapter = contactsAdapter
     }
 
-    fun showAddEditDialog(isUpdate: Boolean, contact: Contact?) {
+    fun showAddEditDialog(isUpdate: Boolean, contact: Contact?, position: Int = -1) {
         val dialog = AddEditContactDialog(this, isUpdate, contact)
         dialog.show(
             onSave = { firstName, lastName, email, phoneNumber ->
@@ -124,6 +144,11 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
                 } else {
                     viewModel.createContact(firstName, lastName, email, phoneNumber)
                 }
+            },
+            onCancel = {
+                if (isUpdate && position != -1) {
+                    contactsAdapter.notifyItemChanged(position)
+                }
             }
         )
     }
@@ -136,8 +161,8 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
         viewModel.deleteContact(contact)
     }
 
-    override fun onContactEdit(contact: Contact) {
-        showAddEditDialog(true, contact)
+    override fun onContactEdit(contact: Contact, position: Int) {
+        showAddEditDialog(true, contact, position)
     }
 
     override fun onOrderChanged(contacts: List<Contact>) {
@@ -145,7 +170,7 @@ class MainActivity : AppCompatActivity(), OnContactClickListener, OnOrderChanged
     }
 
     inner class MainActivityButtonHandler() {
-        fun onButtonClick(view: View) {
+        fun onButtonClick() {
             showAddEditDialog(false, null)
         }
     }

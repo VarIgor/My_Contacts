@@ -94,7 +94,7 @@ class ContactsAdapter(
             ItemTouchHelper.RIGHT -> {
                 Log.d("Update", "Update item ${contacts[position].firstName}")
                 val contact = contacts[position]
-                clickListener.onContactEdit(contact)
+                clickListener.onContactEdit(contact, position)
             }
         }
     }
