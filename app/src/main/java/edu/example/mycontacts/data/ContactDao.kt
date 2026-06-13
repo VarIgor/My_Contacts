@@ -17,13 +17,13 @@ interface ContactDao {
     @Update
     suspend fun updateContact(contact: Contact)
 
+    @Update
+    suspend fun updateContacts(contacts: List<Contact>)
+
     @Delete
     suspend fun deleteContact(contact: Contact)
 
     @Query("SELECT * FROM contacts ORDER BY display_order ASC")
     fun getAllContacts(): Flow<List<Contact>>
-
-    @Query("select * from contacts where contact_id ==:contactId")
-    suspend fun getContact(contactId: Long): Contact
 
 }

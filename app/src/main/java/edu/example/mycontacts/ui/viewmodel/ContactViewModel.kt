@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class ContactViewModel(
@@ -76,7 +77,6 @@ class ContactViewModel(
 
     fun deleteContact(contact: Contact) {
         deleteJob?.cancel()
-
         pendingDeleteContact = contact
         isUndoActive = true
         _contacts.value = _contacts.value.filter { it.id != contact.id }
@@ -100,16 +100,11 @@ class ContactViewModel(
         _showUndoSnackbar.value = null
         isUndoActive = false
 
-        val allList = _allContacts.value.toMutableList()
-        val allPosition = allList.indexOfFirst { it.displayOrder > contact.displayOrder }
-        if (allPosition >= 0) {
-            allList.add(allPosition, contact)
-        } else {
-            allList.add(contact)
+        viewModelScope.launch {
+            val freshList = repository.getAllContacts().first()
+            _allContacts.value = freshList
+            filterContacts(currentQuery)
         }
-        _allContacts.value = allList
-
-        filterContacts(currentQuery)
 
         pendingDeleteContact = null
         showSimpleMessage("Удаление отменено")
@@ -117,7 +112,7 @@ class ContactViewModel(
 
     fun updateContactsOrder(contacts: List<Contact>) {
         viewModelScope.launch {
-            repository.updateContactsOrder(contacts)
+            repository.updateContacts(contacts)
             _allContacts.value = contacts
             filterContacts(currentQuery)
         }
@@ -134,9 +129,9 @@ class ContactViewModel(
         } else {
             val filtered = _allContacts.value.filter { contact ->
                 contact.firstName.contains(query, ignoreCase = true) ||
-                contact.lastName.contains(query, ignoreCase = true) ||
-                contact.email.contains(query, ignoreCase = true) ||
-                contact.phoneNumber.contains(query, ignoreCase = true)
+                        contact.lastName.contains(query, ignoreCase = true) ||
+                        contact.email.contains(query, ignoreCase = true) ||
+                        contact.phoneNumber.contains(query, ignoreCase = true)
             }
             _contacts.value = filtered
         }
