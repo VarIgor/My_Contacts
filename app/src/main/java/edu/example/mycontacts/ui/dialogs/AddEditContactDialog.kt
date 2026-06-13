@@ -45,7 +45,7 @@ class AddEditContactDialog(
             .setView(view)
             .setCancelable(false)
             .setPositiveButton(if (isUpdate) "Update" else "Save", null)
-            .setNegativeButton("Cancel") { _, _ -> handleCancel(onCancel) }
+            .setNegativeButton("Cancel", null)
             .create()
 
         dialog.show()
@@ -60,6 +60,23 @@ class AddEditContactDialog(
                     result.email,
                     result.phoneNumber
                 )
+            }
+        }
+
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+            if (isUpdate && hasChanges()) {
+                showConfirmationDialog(
+                    title = "Отменить изменение",
+                    message = "Вы уверены, что хотите отменить изменения? Несохранённые данные будут потеряны",
+                    onConfirm = {
+                        dialog.dismiss()
+                        onCancel?.invoke()
+                    },
+                    onCancel = { }
+                )
+            } else {
+                dialog.dismiss()
+                onCancel?.invoke()
             }
         }
     }
@@ -107,18 +124,6 @@ class AddEditContactDialog(
         return false
     }
 
-    private fun handleCancel(onCancel: (() -> Unit)?) {
-        if (isUpdate && hasChanges()) {
-            showConfirmationDialog(
-                title = "Отменить изменение",
-                message = "Вы уверены, что хотите отменить изменения? Несохранёние данных будут потеряны",
-                onConfirm = { onCancel?.invoke() ?: Unit }
-            )
-        } else {
-            onCancel?.invoke()
-        }
-    }
-
     private fun hasChanges(): Boolean {
         val current = getInputValues()
         return current.firstName != originalFirstName ||
@@ -130,13 +135,14 @@ class AddEditContactDialog(
     private fun showConfirmationDialog(
         title: String,
         message: String,
-        onConfirm: () -> Unit
+        onConfirm: () -> Unit,
+        onCancel: () -> Unit = {}
     ) {
         AlertDialog.Builder(context)
             .setTitle(title)
             .setMessage(message)
             .setPositiveButton("Да") { _, _ -> onConfirm() }
-            .setNegativeButton("Нет", null)
+            .setNegativeButton("Нет") { _, _ -> onCancel() }
             .show()
     }
 
